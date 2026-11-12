@@ -96,3 +96,9 @@ dismissed by the agent, and those steps are yours to press.
 
 The UI chrome follows the Host palette through `--color-*` tokens and falls back to its own when it
 is opened without a host.
+
+## The workspace next door is read-only
+
+`scripts/prove-install.sh` reads a `ponpoko` CLI binary from the sibling workspace and installs the
+bundle into an isolated `PONPOKO_HOME`; it writes nothing into `../ponpoko-workspace`. The check that
+proves this asks every clean repository there for its status and asserts it stays empty.
