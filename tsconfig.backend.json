@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun"],
+    "lib": ["ES2022"],
+    "jsx": "react-jsx",
+    "resolveJsonModule": true
+  },
+  "include": ["backend", "src/contracts"]
+}

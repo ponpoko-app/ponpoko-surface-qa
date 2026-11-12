@@ -1,0 +1,41 @@
+{
+  "id": "qa",
+  "name": "QA",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "description": "Software testing on this machine: pick a window, agree the cases with a PO, then watch every step run with its own screenshot.",
+  "contributes": [
+    {
+      "slot": "nav",
+      "title": "QA",
+      "icon": "generic"
+    }
+  ],
+  "backend": {
+    "command": "bin/qa-backend"
+  },
+  "methods": [
+    "app.info",
+    "qa.targets",
+    "qa.probe",
+    "qa.capture",
+    "qa.ax",
+    "qa.act",
+    "qa.project.list",
+    "qa.project.open",
+    "qa.project.save",
+    "qa.cases.read",
+    "qa.cases.write",
+    "qa.baseline.get",
+    "qa.baseline.put",
+    "qa.run.record",
+    "qa.run.list",
+    "qa.pi.status",
+    "qa.pi.check",
+    "qa.pi.update",
+    "qa.pi.ask"
+  ],
+  "requires": {
+    "ai": 1
+  }
+}
