@@ -256,6 +256,7 @@ export const QA_METHODS = [
   "qa.project.save",
   "qa.cases.read",
   "qa.cases.write",
+  "qa.cases.draft",
   "qa.baseline.get",
   "qa.baseline.put",
   "qa.run.record",

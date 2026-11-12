@@ -33,7 +33,8 @@
     "qa.pi.status",
     "qa.pi.check",
     "qa.pi.update",
-    "qa.pi.ask"
+    "qa.pi.ask",
+    "qa.cases.draft"
   ],
   "requires": {
     "ai": 1
