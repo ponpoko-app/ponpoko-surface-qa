@@ -1,10 +1,11 @@
-import type { Capture, Capability, ProbeSignals, Tier, TargetWindow } from "../src/contracts/qa";
-import { actOnWindow } from "./act";
+import type { Capture, Capability, ProbeSignals, Tier } from "../src/contracts/qa";
 import { readAxTree, countTree } from "./ax";
 import { captureWindow } from "./capture";
 import { isTrusted } from "./hands";
+import { drive, inspect } from "./drivers";
 import { requireInt, type Env, type Registry } from "./rpc";
 import { findWindow, listTargets } from "./targets";
+import { cdpEndpointFor } from "./web";
 
 export function tierFor(signals: ProbeSignals): { tier: Tier; reason: string } {
   if (signals.cdp_endpoint !== null) {
@@ -32,28 +33,6 @@ export function tierFor(signals: ProbeSignals): { tier: Tier; reason: string } {
     };
   }
   return { tier: "C", reason: "อ่าน accessibility tree ไม่ได้เลย จึงเหลือเพียงภาพบนจอให้ตัดสิน" };
-}
-
-async function cdpEndpointFor(window: TargetWindow): Promise<string | null> {
-  const endpoint = "http://127.0.0.1:9222";
-  try {
-    const version = await fetch(`${endpoint}/json/version`, { signal: AbortSignal.timeout(600) });
-    if (!version.ok) return null;
-    const listing = await fetch(`${endpoint}/json/list`, { signal: AbortSignal.timeout(800) });
-    if (!listing.ok) return null;
-    const targets = (await listing.json()) as unknown;
-    if (!Array.isArray(targets)) return null;
-    const wanted = window.title.trim().toLowerCase();
-    if (wanted.length === 0) return null;
-    const matched = targets.some((target) => {
-      if (typeof target !== "object" || target === null) return false;
-      const title = (target as { title?: unknown }).title;
-      return typeof title === "string" && title.toLowerCase().includes(wanted);
-    });
-    return matched ? endpoint : null;
-  } catch {
-    return null;
-  }
 }
 
 export async function probeWindow(dataDir: string, windowId: number): Promise<Capability> {
@@ -90,6 +69,7 @@ export function handsMethods(env: Env): Registry {
       const tree = await readAxTree(env.dataDir, window.pid, maxNodes, 14);
       return tree.node;
     },
-    "qa.act": async (params) => actOnWindow(env.dataDir, params as never),
+    "qa.act": async (params) => drive(env.dataDir, params as never),
+    "qa.inspect": async (params) => inspect(env.dataDir, params as never),
   };
 }

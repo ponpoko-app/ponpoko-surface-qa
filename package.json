@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "QA is a Ponpoko surface: pick real software on this machine, agree the cases with a PO, and watch every step run with its own screenshot.",
+  "description": "QA is an app-agnostic Ponpoko surface for guided native GUI, Web DOM, HTTP API and command-line testing with visible evidence.",
   "scripts": {
     "dev": "vite",
     "typecheck": "bunx tsc -p tsconfig.json --noEmit && bunx tsc -p tsconfig.backend.json --noEmit",

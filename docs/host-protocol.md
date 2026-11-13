@@ -45,11 +45,9 @@ door a later round will use to draft steps that click and type instead of only l
 
 ## Where the files came from
 
-`ai-contract.json`, `host-ai.mjs` and `host-ai.d.ts` are the generated Host AI assets, copied from
-the sibling `ponpoko-surface-chat` checkout at the same Host version (contract 1,
-`schema_sha256` unchanged). They are not edited here; regenerate them from the Host when the
-contract version moves. `ai-requests.json` carries one safe representative request for the
-surface's real workflow: an image and a question, answered with text.
+The generated AI contract and adapters come from the pinned public Surface SDK; see
+[SDK provenance and compatibility checks](sdk.md). `ai-requests.json` carries a safe
+representative request: an image and a question, answered with text.
 
 ## Failure the user sees
 

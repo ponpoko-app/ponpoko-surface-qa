@@ -51,4 +51,18 @@ describe("the verdict law", () => {
     expect(verdictFor({ action: clicked, structural: visible, visual: visual("yes", [finding("nit")]), diff: null })).toBe("pass");
     expect(verdictFor({ action: clicked, structural: visible, visual: visual("yes", [finding("minor")]), diff: null })).toBe("pass");
   });
+
+  test("an unmeasured action or structure can never borrow a visual pass", () => {
+    const action = { ...clicked, measured: false };
+    const structure = { ...visible, measured: false };
+    expect(verdictFor({ action, structural: visible, visual: visual("yes"), diff: null })).toBe("unmeasured");
+    expect(verdictFor({ action: clicked, structural: structure, visual: visual("yes"), diff: null })).toBe("unmeasured");
+    expect(verdictFor({ action, structural: structure, visual: null, diff: null, visualRequired: false })).toBe("unmeasured");
+  });
+
+  test("non-visual drivers need measured action and output assertions, never a vision judge", () => {
+    expect(verdictFor({ action: clicked, structural: visible, visual: null, diff: null, visualRequired: false })).toBe("pass");
+    expect(verdictFor({ action: clicked, structural: absent, visual: null, diff: null, visualRequired: false })).toBe("failed");
+    expect(verdictFor({ action: null, structural: null, visual: null, diff: null, visualRequired: false })).toBe("unmeasured");
+  });
 });

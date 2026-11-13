@@ -5,15 +5,21 @@ export interface VerdictInput {
   structural: StructuralResult | null;
   visual: VisualResult | null;
   diff: DiffResult | null;
+  visualRequired?: boolean;
 }
 
 export function verdictFor(input: VerdictInput): Verdict {
   const { action, structural, visual } = input;
+  if (action?.measured === false || structural?.measured === false) return "unmeasured";
   if (action !== null && action.ok === false) return "failed";
+  if (input.visualRequired === false) {
+    if (action === null && structural === null) return "unmeasured";
+    if (structural !== null && !structural.ok) return "failed";
+    return "pass";
+  }
   if (visual === null || visual.verdict === "error" || visual.verdict === "unsure") return "unmeasured";
   if (structural !== null && !structural.ok) return visual.verdict === "yes" ? "ghost" : "failed";
-  if (structural === null) return visual.verdict === "no" ? "failed" : "pass";
-  if (visual.verdict === "no") return "invisible";
+  if (visual.verdict === "no") return structural === null ? "failed" : "invisible";
   const serious = visual.findings.some((finding) => finding.severity === "blocker" || finding.severity === "major");
   return serious ? "visual" : "pass";
 }

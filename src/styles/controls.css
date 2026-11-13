@@ -1,0 +1,132 @@
+@import url("./tokens.css");
+@import url("./base.css");
+
+input,
+textarea,
+select {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-height);
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--rule-hair) solid var(--color-muted);
+  border-radius: var(--radius-pill);
+  outline: 2px solid transparent;
+  outline-offset: -3px;
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  caret-color: var(--color-accent);
+  transition: background-color var(--dur-micro) var(--ease-out);
+}
+
+textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  background: var(--color-paper-2);
+  color: var(--color-muted);
+}
+
+input:hover:not(:disabled),
+textarea:hover:not(:disabled),
+select:hover:not(:disabled) {
+  background: var(--color-paper-2);
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-color: var(--color-focus);
+}
+
+input[readonly] {
+  color: var(--color-ink-2);
+}
+
+input[type="number"] {
+  font-family: var(--font-outlier);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: var(--space-md);
+  min-height: var(--space-md);
+  padding: 0;
+  accent-color: var(--color-accent);
+}
+
+summary {
+  min-height: var(--control-height);
+  color: var(--color-ink-2);
+  cursor: pointer;
+  list-style: none;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+summary:hover {
+  color: var(--color-ink);
+}
+
+dt,
+.ask {
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+dd {
+  margin-inline-start: 0;
+  overflow-wrap: break-word;
+}
+
+.questions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-lg) var(--gap-columns);
+}
+
+.question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+  padding-block-start: var(--space-md);
+  border-block-start: var(--rule-hair) solid var(--color-rule);
+}
+
+.questions > .question:first-child {
+  grid-column: 1 / -1;
+}
+
+.actions,
+.phase-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.phase-actions {
+  padding-block-start: var(--space-md);
+  border-block-start: var(--rule-hair) solid var(--color-rule);
+}
+
+@media (pointer: coarse) {
+  button,
+  summary {
+    min-height: 48px;
+  }
+}

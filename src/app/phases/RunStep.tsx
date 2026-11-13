@@ -1,135 +1,142 @@
-import { useMemo, useState } from "react";
-import type { RunEvent, VisionJudge } from "../../contracts/qa";
-import { createVisionJudge } from "../../vision/judge";
+import { useEffect, useState } from "react";
+import type { RunController, RunEvent, RunInput } from "../../contracts/qa";
+import { ACTION_LABELS, ACTOR_LABELS } from "../case-editor/edit";
+import { Evidence } from "../run/Evidence";
 import { VERDICT_LABELS } from "../../vision/verdict";
-import { hostPort } from "../host";
-import { createRunController } from "../run/loop";
 import type { PhaseProps } from "./TargetStep";
 
-const unjudged: VisionJudge = {
-  judge: async () => ({
-    verdict: "unsure",
-    confidence: 0,
-    quote: "",
-    visible_text: [],
-    findings: [],
-    error: "surface นี้ไม่ได้รับ AI จาก host จึงยังตัดสินด้วยตาไม่ได้",
-  }),
-};
-
-export function RunStep({ host, state, dispatch, fail }: PhaseProps): React.ReactElement {
-  const [events, setEvents] = useState<RunEvent[]>([]);
+export function RunStep({ host, state, dispatch, controller }: PhaseProps & { controller: RunController }): React.ReactElement {
+  const [events, setEvents] = useState<RunEvent[]>(controller.events());
   const [running, setRunning] = useState(false);
-  const controller = useMemo(
-    () => createRunController({ port: hostPort(host), judge: host.ai === null ? unjudged : createVisionJudge(host.ai) }),
-    [host],
-  );
+  const [stopping, setStopping] = useState(false);
+  useEffect(() => controller.subscribe(() => setEvents(controller.events())), [controller]);
 
   const testCase = state.cases.find((row) => row.id === state.selectedCaseId) ?? null;
+  const results = events.flatMap((event) => event.type === "step_finished" ? [event.result] : []);
+  const resultByStep = new Map(results.map((result) => [result.step_id, result]));
+  const activeStep = running ? [...events].reverse().find((event) => event.type === "step_started") : undefined;
 
-  const run = async (): Promise<void> => {
-    if (state.project === null || testCase === null || state.window === null) return;
-    setEvents([]);
+  const input = (): RunInput | null => {
+    if (state.project === null || testCase === null || state.window === null) return null;
+    return {
+      project: state.project,
+      testCase,
+      window_id: state.window.window_id,
+      standard: state.project.answers.design_standard,
+    };
+  };
+
+  const execute = async (all: boolean): Promise<void> => {
+    const request = input();
+    if (request === null || running) return;
+    if (all) {
+      controller.reset();
+      dispatch({ type: "reset_run" });
+    }
     setRunning(true);
-    dispatch({ type: "reset_run" });
-    const unsubscribe = controller.subscribe((event) => setEvents((current) => [...current, event]));
+    dispatch({ type: "running", running: true });
     try {
-      const record = await controller.start({
-        project: state.project,
-        testCase,
-        window_id: state.window.window_id,
-        standard: state.project.answers.design_standard,
-      });
-      if (record !== null) dispatch({ type: "record", record });
+      if (all) await controller.start(request);
+      else await controller.next(request);
     } catch (error) {
-      fail(error);
+      dispatch({ type: "error", message: error instanceof Error ? error.message : String(error) });
     } finally {
-      unsubscribe();
       setRunning(false);
+      dispatch({ type: "running", running: false });
+      setStopping(false);
     }
   };
 
   return (
-    <section className="phase">
-      <h2>รันทีละขั้นให้เห็นทุกจังหวะ</h2>
-      <p className="muted">
-        {state.window?.app_name ?? ""} · case {testCase?.id ?? "-"} · {testCase?.steps.length ?? 0} step
-      </p>
-      <div className="actions">
-        <button type="button" className="primary" onClick={() => void run()} disabled={running || testCase === null}>
-          เริ่มรัน
-        </button>
-        <button type="button" onClick={() => controller.stop()} disabled={!running}>
-          หยุด
-        </button>
-        <button type="button" onClick={() => dispatch({ type: "phase", phase: "cases" })}>
-          กลับไปแก้ case
-        </button>
-      </div>
-
-      <ol className="timeline">
-        {events.map((event, index) => {
-          if (event.type === "step_started") {
+    <section className="phase wide">
+      <div className="run-overview">
+        <div className="section-heading">
+          <div>
+            <h2>{testCase?.title ?? "ยังไม่ได้เลือก case"}</h2>
+            <div className="record-meta">
+              <span>{state.window?.app_name ?? ""}</span>
+              <span className="instrument">{testCase?.id ?? "-"}</span>
+            </div>
+            {host.ai === null && <p className="warn">ไม่มี Host AI: GUI/Web จะยังไม่ได้วัดภาพ แต่ HTTP/CLI ยังตรวจ output ได้</p>}
+          </div>
+        </div>
+        <div className="run-progress" role="status" aria-live="polite">
+          <span className="measure-value">{results.length}/{testCase?.steps.length ?? 0}</span>
+          <span className="muted">step ที่เสร็จแล้ว</span>
+        </div>
+        <div className="actions run-toolbar">
+          <button type="button" className="primary" onClick={() => void execute(true)} disabled={running || testCase === null}>
+            {results.length > 0 ? "เริ่มรอบใหม่และรันทั้ง case" : "รันทั้ง case"}
+          </button>
+          <button type="button" onClick={() => void execute(false)} disabled={running || testCase === null || controller.snapshot()?.finished_at != null}>
+            {results.length > 0 && results.length < (testCase?.steps.length ?? 0) ? "ทำ step ถัดไป" : "เริ่มทีละ step"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              controller.stop();
+              setStopping(true);
+            }}
+            disabled={!running || stopping}
+          >
+            {stopping ? "จะหยุดหลัง step นี้…" : "หยุดหลัง step นี้"}
+          </button>
+          <button type="button" onClick={() => dispatch({ type: "phase", phase: "cases" })} disabled={running}>
+            กลับไปแก้ case
+          </button>
+        </div>
+        <ol className="run-plan" aria-label="ลำดับการทดสอบ">
+          {testCase?.steps.map((step, index) => {
+            const result = resultByStep.get(step.id);
+            const active = activeStep?.type === "step_started" && activeStep.step_id === step.id;
             return (
-              <li key={`start-${event.step_id}-${index}`} className="timeline-row pending">
-                <span className="count">
-                  {event.index + 1}/{event.total}
+              <li
+                key={step.id}
+                className={active ? "run-step active" : result !== undefined ? `run-step ${result.verdict}` : "run-step"}
+                aria-current={active ? "step" : undefined}
+              >
+                <span className="count">{index + 1}</span>
+                <div>
+                  <strong>{step.title}</strong>
+                  <p className="muted run-step-meta"><span>{ACTOR_LABELS[step.actor].replace(" · ", ": ")}</span><span>{ACTION_LABELS[step.action.type]}</span></p>
+                </div>
+                <span className={result !== undefined ? `badge ${result.verdict}` : "badge"}>
+                  {result !== undefined ? VERDICT_LABELS[result.verdict] : active ? "กำลังทำ…" : "รอ"}
                 </span>
-                <div>
-                  <strong>{event.title}</strong>
-                  <p className="muted">กำลังทำ…</p>
-                </div>
               </li>
             );
-          }
-          if (event.type === "step_finished") {
-            const result = event.result;
-            return (
-              <li key={`done-${result.step_id}-${index}`} className={`timeline-row ${result.verdict}`}>
-                <span className="count">{result.step_id}</span>
-                <div>
-                  <strong>{result.title}</strong>
-                  <p>
-                    <span className={`badge ${result.verdict}`}>{VERDICT_LABELS[result.verdict]}</span>
-                    {result.action !== null && <span className="muted"> · {result.action.detail}</span>}
-                  </p>
-                  {result.visual !== null && result.visual.quote.length > 0 && (
-                    <p className="quote">“{result.visual.quote}”</p>
-                  )}
-                  {result.visual?.error !== null && result.visual?.error !== undefined && (
-                    <p className="warn">{result.visual.error}</p>
-                  )}
-                  {result.capture.failure !== null && <p className="warn">{result.capture.failure}</p>}
-                  {result.capture.base64 !== null && (
-                    <img
-                      className="shot"
-                      alt={`หน้าจอของ step ${result.step_id}`}
-                      src={`data:image/png;base64,${result.capture.base64}`}
-                    />
-                  )}
-                </div>
-              </li>
-            );
-          }
-          if (event.type === "run_failed") {
-            return (
-              <li key={`failed-${index}`} className="timeline-row failed">
-                <span className="count">!</span>
-                <div>{event.message}</div>
-              </li>
-            );
-          }
-          if (event.type === "run_stopped") {
-            return (
-              <li key={`stopped-${index}`} className="timeline-row unmeasured">
-                <span className="count">■</span>
-                <div>หยุดตามที่สั่ง</div>
-              </li>
-            );
-          }
-          return null;
-        })}
-      </ol>
+          })}
+        </ol>
+      </div>
+      <section aria-label="หลักฐานจาก step ที่รันแล้ว" className="evidence-section">
+        <h3>Action, output และ screenshot ที่วัดได้</h3>
+        <ol className="timeline">
+          {events.map((event, index) => {
+            if (event.type === "step_finished") {
+              return (
+                <li key={`done-${event.result.step_id}-${index}`} className={`timeline-row ${event.result.verdict}`}>
+                  <span className="count">{event.result.step_id}</span>
+                  <div>
+                    <strong>{event.result.title}</strong>
+                    <Evidence result={event.result} step={testCase?.steps.find((step) => step.id === event.result.step_id)} />
+                  </div>
+                </li>
+              );
+            }
+            if (event.type === "run_failed") {
+              return <li key={`failed-${index}`} className="timeline-row failed"><span className="count" aria-hidden="true">!</span><div>{event.message}</div></li>;
+            }
+            if (event.type === "run_stopped") {
+              return <li key={`stopped-${index}`} className="timeline-row unmeasured"><span className="count" aria-hidden="true">■</span><div>หยุดแล้ว. กด “ทำ step ถัดไป” เพื่อทำต่อจากผลที่เก็บไว้</div></li>;
+            }
+            if (event.type === "run_paused") {
+              return <li key={`paused-${index}`} className="timeline-row"><span className="count" aria-hidden="true">Ⅱ</span><div>จบ step นี้แล้ว ตรวจหลักฐานก่อนกด “ทำ step ถัดไป”</div></li>;
+            }
+            return null;
+          })}
+        </ol>
+        {events.length === 0 && <p className="muted">เลือกรันทั้ง case หรือเริ่มทีละ step เพื่อเห็น action และหลักฐานที่นี่</p>}
+      </section>
     </section>
   );
 }

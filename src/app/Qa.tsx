@@ -6,10 +6,12 @@ import { InterviewStep } from "./phases/InterviewStep";
 import { CasesStep } from "./phases/CasesStep";
 import { RunStep } from "./phases/RunStep";
 import { ReportStep } from "./phases/ReportStep";
+import { useRunController } from "./run/session";
 import { Updates } from "./updates/Updates";
 
 export function Qa({ host, info }: { host: Host; info: HostInfo }): React.ReactElement {
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
+  const controller = useRunController(host, dispatch);
   const fail = (error: unknown): void =>
     dispatch({ type: "error", message: error instanceof Error ? error.message : String(error) });
 
@@ -37,11 +39,30 @@ export function Qa({ host, info }: { host: Host; info: HostInfo }): React.ReactE
         <Updates host={host} />
       </header>
 
+      <dl className="context-strip" aria-live="polite">
+        <div>
+          <dt>เป้าหมาย</dt>
+          <dd>
+            {state.window === null ? "ยังไม่ได้เลือก" : (
+              <>
+                <span className="context-value">{state.window.app_name}</span>
+                <span className="muted context-title">{state.window.title || "ไม่มีชื่อหน้าต่าง"}</span>
+              </>
+            )}
+          </dd>
+        </div>
+        <div><dt>Case</dt><dd className="instrument">{state.selectedCaseId ?? "ยังไม่ได้เลือก"}</dd></div>
+        <div>
+          <dt>ความคืบหน้า</dt>
+          <dd>{state.results.length > 0 ? <><span className="instrument">{state.results.length}</span> step ที่มีผลแล้ว</> : state.phase === "report" ? "รอบนี้จบแล้ว" : "รอเริ่ม"}</dd>
+        </div>
+      </dl>
+
       <main className="body">
         {state.phase === "target" && <TargetStep host={host} state={state} dispatch={dispatch} fail={fail} />}
         {state.phase === "interview" && <InterviewStep host={host} state={state} dispatch={dispatch} fail={fail} />}
         {state.phase === "cases" && <CasesStep host={host} state={state} dispatch={dispatch} fail={fail} />}
-        {state.phase === "run" && <RunStep host={host} state={state} dispatch={dispatch} fail={fail} />}
+        {state.phase === "run" && <RunStep controller={controller} host={host} state={state} dispatch={dispatch} fail={fail} />}
         {state.phase === "report" && <ReportStep state={state} dispatch={dispatch} />}
       </main>
 
@@ -53,7 +74,12 @@ export function Qa({ host, info }: { host: Host; info: HostInfo }): React.ReactE
           </button>
         </div>
       )}
-      {state.busy && <div className="busy" aria-live="polite">กำลังทำงาน…</div>}
+      {state.busy && (
+        <div className="busy" role="status" aria-live="polite">
+          <span className="wait-mark busy-mark" aria-hidden="true">↻</span>
+          <span>กำลังทำงาน…</span>
+        </div>
+      )}
     </div>
   );
 }

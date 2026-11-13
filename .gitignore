@@ -1,4 +1,5 @@
 node_modules
 dist
 *.tsbuildinfo
+.hallmark/
 .DS_Store

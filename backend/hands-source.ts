@@ -151,6 +151,47 @@ func mouseCommand(_ x: Double, _ y: Double, _ button: Int, _ count: Int) {
     print("{\"sent\":true}")
 }
 
+var selectedPid: pid_t? = nil
+
+func focusTarget(_ encoded: String) -> Bool {
+    guard AXIsProcessTrusted(), let data = encoded.data(using: .utf8),
+          let target = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+          let pid = target["pid"] as? Int, let windowId = target["window_id"] as? UInt32,
+          let rect = target["rect"] as? [String: Double], let title = target["title"] as? String,
+          let x = rect["x"], let y = rect["y"], let width = rect["width"], let height = rect["height"],
+          let listed = CGWindowListCopyWindowInfo(.optionIncludingWindow, CGWindowID(windowId)) as? [[String: Any]],
+          let actual = listed.first, actual[kCGWindowOwnerPID as String] as? Int == pid,
+          let bounds = actual[kCGWindowBounds as String] as? [String: Any],
+          let current = CGRect(dictionaryRepresentation: bounds as CFDictionary),
+          abs(current.minX - x) < 2, abs(current.minY - y) < 2,
+          abs(current.width - width) < 2, abs(current.height - height) < 2 else { return false }
+    let app = AXUIElementCreateApplication(pid_t(pid))
+    let matching = axWindows(app).filter { window in
+        let (wx, wy, ww, wh) = frame(window)
+        return abs(wx - x) < 2 && abs(wy - y) < 2 && abs(ww - width) < 2 && abs(wh - height) < 2 &&
+            (title.isEmpty || text(window, kAXTitleAttribute) == title)
+    }
+    guard matching.count == 1, let window = matching.first,
+          let process = NSRunningApplication(processIdentifier: pid_t(pid)) else { return false }
+    guard process.activate(options: [.activateIgnoringOtherApps]),
+          AXUIElementPerformAction(window, kAXRaiseAction as CFString) == .success else { return false }
+    for _ in 0..<20 {
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier == pid_t(pid),
+           let focused = attr(app, kAXFocusedWindowAttribute), CFEqual(focused, window) {
+            selectedPid = pid_t(pid)
+            return true
+        }
+        usleep(50_000)
+    }
+    return false
+}
+
+func requireTarget(_ index: Int) -> Bool {
+    if CommandLine.arguments.count > index, focusTarget(CommandLine.arguments[index]) { return true }
+    print("{\"sent\":false,\"error\":\"Selected window could not be focused and verified; no input was sent\"}")
+    return false
+}
+
 func typeCommand(_ encoded: String) {
     guard let data = Data(base64Encoded: encoded), let body = String(data: data, encoding: .utf8) else {
         print("{\"sent\":false,\"error\":\"text was not base64 utf8\"}")
@@ -158,6 +199,10 @@ func typeCommand(_ encoded: String) {
     }
     let source = CGEventSource(stateID: .hidSystemState)
     for scalar in body.unicodeScalars {
+        guard selectedPid == NSWorkspace.shared.frontmostApplication?.processIdentifier else {
+            print("{\"sent\":false,\"error\":\"Target focus changed during typing; inspect the partial outcome\"}")
+            return
+        }
         var unit = UniChar(scalar.value)
         if scalar.value > 0xFFFF { unit = UniChar(0xFFFD) }
         let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
@@ -221,11 +266,11 @@ case "axtree":
 case "hit":
     hitCommand(pid_t(number(2, 0)), number(3, 0), number(4, 0))
 case "click":
-    mouseCommand(number(2, 0), number(3, 0), Int(number(4, 1)), Int(number(5, 1)))
+    if requireTarget(6) { mouseCommand(number(2, 0), number(3, 0), Int(number(4, 1)), Int(number(5, 1))) }
 case "type":
-    typeCommand(arguments.count > 2 ? arguments[2] : "")
+    if requireTarget(3) { typeCommand(arguments.count > 2 ? arguments[2] : "") }
 case "key":
-    keyCommand(arguments.count > 2 ? arguments[2] : "")
+    if requireTarget(3) { keyCommand(arguments.count > 2 ? arguments[2] : "") }
 default:
     print("{\"error\":\"unknown command\"}")
 }

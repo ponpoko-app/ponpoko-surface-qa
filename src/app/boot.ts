@@ -22,11 +22,11 @@ export interface BootFailure {
 export function unhostedFailure(): BootFailure {
   return {
     kind: "unhosted",
-    title: "QA — a Ponpoko surface",
+    title: "QA, a Ponpoko surface",
     detail:
       "Ponpoko loads this page inside its own window and gives it a narrow bridge. Opened on its own there is no screen to measure and no window to drive.",
     recovery:
-      "เปิด Ponpoko แล้วเลือก QA จากแถบแท็บ — bundle นี้ติดตั้งจาก repo ของมันเอง และ backend ของมันคือมือที่กดและถ่ายภาพหน้าจอจริง",
+      "เปิด Ponpoko แล้วเลือก QA จากแถบแท็บ. bundle นี้ติดตั้งจาก repo ของมันเอง และ backend ของมันคือมือที่กดและถ่ายภาพหน้าจอจริง",
   };
 }
 

@@ -24,6 +24,7 @@ import {
   type RunRecord,
   type SeeCheck,
   type StepResult,
+  type StructuralResult,
   type TargetApp,
   type TargetWindow,
   type TargetsView,
@@ -66,6 +67,16 @@ function list(value: unknown): unknown[] {
 
 function strings(value: unknown): string[] {
   return list(value).filter((entry): entry is string => typeof entry === "string");
+}
+
+function stringRecord(value: unknown): Record<string, string> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const entries = Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string");
+  return Object.fromEntries(entries);
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
@@ -155,11 +166,21 @@ export function readActResult(value: unknown): ActResult {
   const row = asRow(value, "the action result");
   const hit = typeof row.hit === "object" && row.hit !== null ? (row.hit as Row) : null;
   const point = typeof row.point === "object" && row.point !== null ? (row.point as Row) : null;
+  const evidence = typeof row.evidence === "object" && row.evidence !== null ? (row.evidence as Row) : null;
   return {
     ok: row.ok === true,
     detail: str(row.detail),
     hit: hit === null ? null : { role: str(hit.role), label: str(hit.label) },
     point: point === null ? null : { x: num(point.x), y: num(point.y) },
+    measured: row.measured !== false,
+    evidence:
+      evidence === null
+        ? null
+        : {
+            driver: oneOf(evidence.driver, STEP_ACTORS, "gui"),
+            status: typeof evidence.status === "number" && Number.isFinite(evidence.status) ? evidence.status : null,
+            output: str(evidence.output),
+          },
   };
 }
 
@@ -215,6 +236,7 @@ export function readLocator(value: unknown): Locator | undefined {
   if (kind === "semantic") return { kind, role: str(row.role), label: str(row.label) };
   if (kind === "text") return { kind, text: str(row.text) };
   if (kind === "visual") return { kind, description: str(row.description), bbox: readRect(row.bbox) };
+  if (kind === "css") return { kind, selector: str(row.selector) };
   return { kind: "point", x: num(row.x), y: num(row.y) };
 }
 
@@ -231,8 +253,15 @@ export function readStep(value: unknown): QaStep {
           locator: readLocator(raw.locator),
           text: nullableStr(raw.text) ?? undefined,
           keys: nullableStr(raw.keys) ?? undefined,
-          ms: typeof raw.ms === "number" ? raw.ms : undefined,
+          ms: optionalNumber(raw.ms),
           url: nullableStr(raw.url) ?? undefined,
+          method: nullableStr(raw.method) ?? undefined,
+          headers: stringRecord(raw.headers),
+          body: typeof raw.body === "string" ? raw.body : undefined,
+          expect_status: optionalNumber(raw.expect_status),
+          command: nullableStr(raw.command) ?? undefined,
+          cwd: nullableStr(raw.cwd) ?? undefined,
+          timeout_ms: optionalNumber(raw.timeout_ms),
         };
   return {
     id: str(row.id),
@@ -270,6 +299,11 @@ export function readFinding(value: unknown): AestheticFinding {
   };
 }
 
+export function readStructuralResult(value: unknown): StructuralResult {
+  const row = asRow(value, "the structural result");
+  return { ok: row.ok === true, detail: str(row.detail), measured: row.measured !== false };
+}
+
 export function readStepResult(value: unknown): StepResult {
   const row = asRow(value, "a step result");
   const visual = typeof row.visual === "object" && row.visual !== null ? (row.visual as Row) : null;
@@ -280,8 +314,7 @@ export function readStepResult(value: unknown): StepResult {
     title: str(row.title),
     at: num(row.at),
     action: row.action === null || row.action === undefined ? null : readActResult(row.action),
-    structural:
-      structural === null ? null : { ok: structural.ok === true, detail: str(structural.detail) },
+    structural: structural === null ? null : readStructuralResult(structural),
     visual:
       visual === null
         ? null

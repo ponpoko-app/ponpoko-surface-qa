@@ -64,10 +64,14 @@ export function InterviewStep({ host, state, dispatch, fail }: PhaseProps): Reac
 
   return (
     <section className="phase">
-      <h2>คุยกับ PO ก่อน แล้ว QA จะร่าง case</h2>
-      <p className="muted">
-        ตอบเฉพาะเรื่องที่ PO เท่านั้นรู้ — QA จะแปลงเป็นขั้นตอนที่ตรวจได้เอง ไม่ต้องเขียน step เองตรงนี้
-      </p>
+      <div className="phase-heading">
+        <div>
+          <h2>คุยกับ PO ก่อน แล้ว QA จะร่าง case</h2>
+          <p className="muted">
+            ตอบเฉพาะเรื่องที่ PO เท่านั้นรู้. QA จะร่าง case และ expectation เริ่มต้น จากนั้นขั้นถัดไปเลือก driver และ action ที่เหมาะกับแต่ละ step ได้จากฟอร์ม
+          </p>
+        </div>
+      </div>
       <div className="questions">
         {INTERVIEW_QUESTIONS.map((question) => (
           <label key={question.id} className="question">
@@ -85,12 +89,14 @@ export function InterviewStep({ host, state, dispatch, fail }: PhaseProps): Reac
           </label>
         ))}
       </div>
-      <button type="button" className="primary" onClick={() => void submit()} disabled={state.busy}>
-        ให้ QA ร่าง case จากคำตอบนี้
-      </button>
-      <button type="button" onClick={() => dispatch({ type: "phase", phase: "target" })}>
-        กลับไปเลือกเป้าหมาย
-      </button>
+      <div className="phase-actions">
+        <button type="button" onClick={() => dispatch({ type: "phase", phase: "target" })}>
+          กลับไปเลือกเป้าหมาย
+        </button>
+        <button type="button" className="primary" onClick={() => void submit()} disabled={state.busy}>
+          ให้ QA ร่าง case จากคำตอบนี้
+        </button>
+      </div>
     </section>
   );
 }

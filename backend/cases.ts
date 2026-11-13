@@ -13,6 +13,13 @@ function actionOf(step: QaStep): Record<string, unknown> {
     ...(action.keys === undefined ? {} : { keys: action.keys }),
     ...(action.ms === undefined ? {} : { ms: action.ms }),
     ...(action.url === undefined ? {} : { url: action.url }),
+    ...(action.method === undefined ? {} : { method: action.method }),
+    ...(action.headers === undefined ? {} : { headers: action.headers }),
+    ...(action.body === undefined ? {} : { body: action.body }),
+    ...(action.expect_status === undefined ? {} : { expect_status: action.expect_status }),
+    ...(action.command === undefined ? {} : { command: action.command }),
+    ...(action.cwd === undefined ? {} : { cwd: action.cwd }),
+    ...(action.timeout_ms === undefined ? {} : { timeout_ms: action.timeout_ms }),
   };
 }
 

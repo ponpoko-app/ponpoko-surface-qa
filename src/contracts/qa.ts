@@ -76,7 +76,7 @@ export interface Capture {
   failure: string | null;
 }
 
-export const LOCATOR_KINDS = ["semantic", "text", "visual", "point"] as const;
+export const LOCATOR_KINDS = ["semantic", "text", "visual", "point", "css"] as const;
 
 export type LocatorKind = (typeof LOCATOR_KINDS)[number];
 
@@ -84,20 +84,39 @@ export type Locator =
   | { kind: "semantic"; role: string; label: string }
   | { kind: "text"; text: string }
   | { kind: "visual"; description: string; bbox: Rect }
-  | { kind: "point"; x: number; y: number };
+  | { kind: "point"; x: number; y: number }
+  | { kind: "css"; selector: string };
 
-export const ACTION_TYPES = ["click", "type", "key", "wait", "open", "none"] as const;
+export const ACTION_TYPES = ["click", "type", "key", "wait", "open", "request", "command", "none"] as const;
 
 export type ActionType = (typeof ACTION_TYPES)[number];
 
+export const STEP_ACTORS = ["gui", "web", "http", "command"] as const;
+
+export type StepActor = (typeof STEP_ACTORS)[number];
+
 export interface ActRequest {
   window_id: number;
+  actor?: StepActor;
   type: ActionType;
   locator?: Locator;
   text?: string;
   keys?: string;
   ms?: number;
   url?: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  expect_status?: number;
+  command?: string;
+  cwd?: string;
+  timeout_ms?: number;
+}
+
+export interface ActEvidence {
+  driver: StepActor;
+  status: number | null;
+  output: string;
 }
 
 export interface ActResult {
@@ -105,11 +124,9 @@ export interface ActResult {
   detail: string;
   hit: { role: string; label: string } | null;
   point: { x: number; y: number } | null;
+  measured?: boolean;
+  evidence?: ActEvidence | null;
 }
-
-export const STEP_ACTORS = ["gui", "web"] as const;
-
-export type StepActor = (typeof STEP_ACTORS)[number];
 
 export const SEE_MODES = ["assert", "critique"] as const;
 
@@ -127,6 +144,12 @@ export interface SeeCheck {
   must_not_show: string[];
   mode: SeeMode;
   dom?: DomExpect;
+}
+
+export interface InspectRequest {
+  actor: StepActor;
+  window_id: number;
+  see: SeeCheck;
 }
 
 export interface QaStep {
@@ -209,6 +232,7 @@ export interface DiffResult {
 export interface StructuralResult {
   ok: boolean;
   detail: string;
+  measured?: boolean;
 }
 
 export interface VisualResult {
@@ -251,6 +275,7 @@ export const QA_METHODS = [
   "qa.capture",
   "qa.ax",
   "qa.act",
+  "qa.inspect",
   "qa.project.list",
   "qa.project.open",
   "qa.project.save",
@@ -275,6 +300,7 @@ export interface QaPort {
   capture(window_id: number): Promise<Capture>;
   ax(window_id: number, max_nodes: number): Promise<AxNode>;
   act(request: ActRequest): Promise<ActResult>;
+  inspect(request: InspectRequest): Promise<StructuralResult | null>;
   readCases(project_id: string): Promise<QaCase[]>;
   getBaseline(project_id: string, case_id: string, step_id: string): Promise<string | null>;
   putBaseline(project_id: string, case_id: string, step_id: string, png_base64: string): Promise<string>;
@@ -322,13 +348,17 @@ export type RunEvent =
   | { type: "run_started"; run_id: string; case_id: string; title: string }
   | { type: "step_started"; step_id: string; index: number; total: number; title: string }
   | { type: "step_finished"; result: StepResult }
+  | { type: "run_paused"; record: RunRecord }
   | { type: "run_finished"; record: RunRecord }
   | { type: "run_failed"; message: string }
   | { type: "run_stopped" };
 
 export interface RunController {
   start(input: RunInput): Promise<RunRecord | null>;
+  next(input: RunInput): Promise<RunRecord | null>;
   stop(): void;
+  reset(): void;
+  snapshot(): RunRecord | null;
   events(): RunEvent[];
   subscribe(handler: (event: RunEvent) => void): () => void;
 }

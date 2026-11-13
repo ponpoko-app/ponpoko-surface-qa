@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles/app.css";
+import "./styles/states.css";
+import "./styles/cases.css";
+import "./styles/data.css";
 import { bootQa, type BootFailure } from "./app/boot";
 import { Booting } from "./app/Booting";
 import type { Host, HostInfo } from "./app/host";

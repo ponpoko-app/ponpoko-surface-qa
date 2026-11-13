@@ -2,26 +2,17 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-PONPOKO="${PONPOKO_CLI:-/Users/saint/zurge/ponpoko-workspace/ponpoko/app/src-tauri/target/release/ponpoko}"
-PROFILE="${QA_PROFILE:-/tmp/qa-ponpoko-profile}"
-STAGE="${QA_STAGE:-/tmp/qa-dist-install}"
-IMAGE="${QA_IMAGE:-/tmp/qa-surface.png}"
-
-if [ ! -x "$PONPOKO" ]; then
-  echo "prove-install: no ponpoko CLI at $PONPOKO — install the bundle from Ponpoko's own Surfaces window instead" >&2
+PONPOKO="${PONPOKO_CLI:-$(command -v ponpoko || true)}"
+if [ -z "$PONPOKO" ] || [ ! -x "$PONPOKO" ]; then
+  echo 'prove-install: set PONPOKO_CLI to an executable Ponpoko CLI' >&2
   exit 1
 fi
-
-rm -rf "$STAGE"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/qa-install.XXXXXX")"
+trap 'rm -rf "$WORK"' EXIT
+PROFILE="$WORK/profile"
+STAGE="$WORK/bundle"
+IMAGE="$WORK/capture.png"
 cp -R "$REPO/dist" "$STAGE"
-python3 - "$STAGE/surface.json" <<'PY'
-import json, sys
-path = sys.argv[1]
-manifest = json.load(open(path))
-manifest.pop("requires", None)
-json.dump(manifest, open(path, "w"), indent=2, ensure_ascii=False)
-open(path, "a").write("\n")
-PY
 
 PONPOKO_HOME="$PROFILE" "$PONPOKO" surface-install --bundle "$STAGE" >/dev/null
 PONPOKO_HOME="$PROFILE" "$PONPOKO" surface-capture qa --image "$IMAGE" >"$STAGE/capture.json"

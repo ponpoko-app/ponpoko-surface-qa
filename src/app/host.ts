@@ -7,10 +7,12 @@ import type {
   AxNode,
   Capture,
   Capability,
+  InspectRequest,
   Project,
   QaCase,
   QaPort,
   RunRecord,
+  StructuralResult,
   TargetsView,
 } from "../contracts/qa";
 import {
@@ -24,6 +26,7 @@ import {
   readPiStatus,
   readPiUpdate,
   readProject,
+  readStructuralResult,
   readTargets,
 } from "../contracts/readers";
 import type { PiCheck, PiStatus, PiUpdateResult, PiUpdateTarget } from "../contracts/pi";
@@ -67,6 +70,10 @@ export function hostPort(host: Host): QaPort {
     ax: async (windowId: number, maxNodes: number): Promise<AxNode> =>
       readAxNode(await hostCall(host, "qa.ax", { window_id: windowId, max_nodes: maxNodes })),
     act: async (request: ActRequest): Promise<ActResult> => readActResult(await hostCall(host, "qa.act", { ...request })),
+    inspect: async (request: InspectRequest): Promise<StructuralResult | null> => {
+      const value = await hostCall<unknown>(host, "qa.inspect", { ...request });
+      return value === null ? null : readStructuralResult(value);
+    },
     readCases: async (projectId: string): Promise<QaCase[]> => readCases(await hostCall(host, "qa.cases.read", { project_id: projectId })),
     getBaseline: async (projectId: string, caseId: string, stepId: string): Promise<string | null> =>
       (await hostCall<string | null>(host, "qa.baseline.get", { project_id: projectId, case_id: caseId, step_id: stepId })) ?? null,
