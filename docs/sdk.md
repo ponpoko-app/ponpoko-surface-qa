@@ -1,7 +1,7 @@
 # Public Host contract
 
-The source contract is [zurge-co/ponpoko-surface-sdk](https://github.com/zurge-co/ponpoko-surface-sdk), pinned at `cca8c6cb3e975186df75d8ea2124a4c0f40e615f`.
-External agents start with its [SKILL.md](https://github.com/zurge-co/ponpoko-surface-sdk/blob/cca8c6cb3e975186df75d8ea2124a4c0f40e615f/SKILL.md).
+The source contract is [ponpoko-app/surface-sdk](https://github.com/ponpoko-app/surface-sdk), pinned at `cca8c6cb3e975186df75d8ea2124a4c0f40e615f`.
+External agents start with its [SKILL.md](https://github.com/ponpoko-app/surface-sdk/blob/cca8c6cb3e975186df75d8ea2124a4c0f40e615f/SKILL.md).
 No private Host checkout is needed to build or check this surface.
 
 `ai-contract.json` and `host-ai.*` are generated assets from that revision. The surface owns
