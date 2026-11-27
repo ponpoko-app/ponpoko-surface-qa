@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createWindowActor } from "../backend/act";
@@ -9,10 +9,27 @@ import { createRunController } from "../src/app/run/loop";
 import { canEnter, initialState, reducer } from "../src/app/state";
 import { createCase, createStep } from "../src/app/case-editor/edit";
 import { verdictFor } from "../src/vision/verdict";
+import { QaStore } from "../backend/store";
 import type { QaPort, RunInput, RunRecord, TargetWindow } from "../src/contracts/qa";
 
 const capture = { base64: null, width: 0, height: 0, at: 0, permission: "unknown" as const, failure: null };
 const visual = { verdict: "yes" as const, confidence: 1, quote: "", visible_text: [], findings: [], error: null };
+
+test("QA storage rejects paths outside its project namespace and linked projects", () => {
+  const data = mkdtempSync(join(tmpdir(), "piqa-store-test-"));
+  try {
+    const store = new QaStore(data);
+    expect(() => store.project("../outside")).toThrow("identifier");
+    mkdirSync(join(data, "projects"));
+    mkdirSync(join(data, "outside"));
+    symlinkSync(join(data, "outside"), join(data, "projects", "linked"), "junction");
+    expect(() => store.project("linked")).toThrow("symbolic links");
+    expect(() => store.writeCases("fixture", [{ ...createCase([], 1), id: "../outside" }])).toThrow("identifier");
+    expect(existsSync(join(data, "projects", "fixture", "outside.yaml"))).toBe(false);
+  } finally {
+    rmSync(data, { recursive: true, force: true });
+  }
+});
 
 function fixture() {
   const saved: RunRecord[] = [];

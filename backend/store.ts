@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PoAnswers, Project, ProjectTarget, QaCase, RunRecord } from "../src/contracts/qa";
 import { readCases, readProject, readRun, asRow } from "../src/contracts/readers";
@@ -15,6 +15,23 @@ export function projectSlug(appId: string): string {
     .slice(0, 40);
   const digest = createHash("sha1").update(appId).digest("hex").slice(0, 8);
   return `${clean.length > 0 ? clean : "target"}-${digest}`;
+}
+
+function storePath(parent: string, name: string): string {
+  if (!/^[A-Za-z0-9_-]{1,128}(?:\.(?:json|yaml|png))?$/.test(name) ||
+      /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) {
+    throw new Error("Invalid QA storage name.");
+  }
+  const path = join(parent, name);
+  if (lstatSync(path, { throwIfNoEntry: false })?.isSymbolicLink()) {
+    throw new Error("QA storage refuses symbolic links.");
+  }
+  return path;
+}
+
+function identifier(value: string): string {
+  if (!/^[a-z0-9_-]{1,120}$/i.test(value)) throw new Error("Invalid QA storage identifier.");
+  return value;
 }
 
 function writeJson(path: string, value: unknown): void {
@@ -33,26 +50,26 @@ export class QaStore {
   }
 
   root(projectId: string): string {
-    return join(this.dataDir, "projects", projectId);
+    return storePath(storePath(this.dataDir, "projects"), identifier(projectId));
   }
 
   projectPaths(projectId: string): { root: string; cases: string; baselines: string; runs: string } {
     const root = this.root(projectId);
     return {
       root,
-      cases: join(root, "cases"),
-      baselines: join(root, "baselines"),
-      runs: join(root, "runs"),
+      cases: storePath(root, "cases"),
+      baselines: storePath(root, "baselines"),
+      runs: storePath(root, "runs"),
     };
   }
 
   list(): Project[] {
-    const base = join(this.dataDir, "projects");
+    const base = storePath(this.dataDir, "projects");
     if (!existsSync(base)) return [];
     const projects: Project[] = [];
     for (const entry of readdirSync(base, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
-      const file = join(base, entry.name, "project.json");
+      const file = storePath(storePath(base, identifier(entry.name)), "project.json");
       if (!existsSync(file)) continue;
       projects.push(readProject(readJson(file)));
     }
@@ -60,7 +77,7 @@ export class QaStore {
   }
 
   project(projectId: string): Project | null {
-    const file = join(this.root(projectId), "project.json");
+    const file = storePath(this.root(projectId), "project.json");
     if (!existsSync(file)) return null;
     return readProject(readJson(file));
   }
@@ -84,7 +101,7 @@ export class QaStore {
   save(project: Project): Project {
     const paths = this.projectPaths(project.project_id);
     mkdirSync(paths.root, { recursive: true });
-    writeJson(join(paths.root, "project.json"), { ...project, updated_at: Date.now() });
+    writeJson(storePath(paths.root, "project.json"), { ...project, updated_at: Date.now() });
     return project;
   }
 
@@ -94,36 +111,38 @@ export class QaStore {
     return readdirSync(paths.cases)
       .filter((file) => file.endsWith(".yaml"))
       .sort()
-      .map((file) => parseCase(readFileSync(join(paths.cases, file), "utf8")));
+      .map((file) => parseCase(readFileSync(storePath(paths.cases, file), "utf8")));
   }
 
   writeCases(projectId: string, cases: QaCase[]): QaCase[] {
     const paths = this.projectPaths(projectId);
     mkdirSync(paths.cases, { recursive: true });
-    for (const testCase of cases) {
-      writeFileSync(join(paths.cases, `${testCase.id}.yaml`), serializeCase(testCase), "utf8");
-    }
+    const files = cases.map((testCase) => ({
+      path: storePath(paths.cases, `${identifier(testCase.id)}.yaml`),
+      text: serializeCase(testCase),
+    }));
+    for (const file of files) writeFileSync(file.path, file.text, "utf8");
     return this.cases(projectId);
   }
 
   baselineGet(projectId: string, caseId: string, stepId: string): string | null {
-    const file = join(this.projectPaths(projectId).baselines, caseId, `${stepId}.png`);
+    const file = storePath(storePath(this.projectPaths(projectId).baselines, identifier(caseId)), `${identifier(stepId)}.png`);
     if (!existsSync(file)) return null;
     return readFileSync(file).toString("base64");
   }
 
   baselinePut(projectId: string, caseId: string, stepId: string, base64: string): string {
-    const dir = join(this.projectPaths(projectId).baselines, caseId);
+    const dir = storePath(this.projectPaths(projectId).baselines, identifier(caseId));
     mkdirSync(dir, { recursive: true });
-    const file = join(dir, `${stepId}.png`);
+    const file = storePath(dir, `${identifier(stepId)}.png`);
     writeFileSync(file, Buffer.from(base64, "base64"));
     return file;
   }
 
   recordRun(run: RunRecord): string {
-    const dir = join(this.projectPaths(run.project_id).runs, run.run_id);
+    const dir = storePath(this.projectPaths(run.project_id).runs, identifier(run.run_id));
     mkdirSync(dir, { recursive: true });
-    const file = join(dir, "run.json");
+    const file = storePath(dir, "run.json");
     writeJson(file, run);
     return file;
   }
@@ -133,7 +152,7 @@ export class QaStore {
     if (!existsSync(dir)) return [];
     return readdirSync(dir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
-      .map((entry) => join(dir, entry.name, "run.json"))
+      .map((entry) => storePath(storePath(dir, identifier(entry.name)), "run.json"))
       .filter((file) => existsSync(file))
       .map((file) => readRun(readJson(file)))
       .sort((left, right) => right.started_at - left.started_at);
